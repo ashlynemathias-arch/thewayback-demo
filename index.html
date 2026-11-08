@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Land Knowledge Map (Prototype)</title>
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="banner" role="note">
+    Prototype. All content is synthetic. Locations, trails and boundaries are fictional and illustrative.
+  </div>
+
+  <div class="layout">
+    <aside class="panel" id="panel" aria-label="Map controls">
+      <h1>Land Knowledge Map</h1>
+      <p class="sub">Prototype for City Media Collective</p>
+
+      <section>
+        <h2>View as</h2>
+        <div class="roles" id="roles" role="radiogroup" aria-label="Access level"></div>
+        <p class="role-blurb" id="roleBlurb"></p>
+        <p class="role-count" id="roleCount"></p>
+      </section>
+
+      <section>
+        <h2>Basemap</h2>
+        <div class="basemap-toggle">
+          <button type="button" id="bmMap" aria-pressed="true">Map</button>
+          <button type="button" id="bmSat" aria-pressed="false">Satellite</button>
+        </div>
+        <button type="button" class="terrain-toggle" id="terrain3dBtn" aria-pressed="false">Tilt to 3D terrain</button>
+        <p class="fine terrain-hint" id="terrainHint" hidden>Drag with the right mouse button (or two fingers) to look around once tilted. Click the compass to reset.</p>
+      </section>
+
+      <section>
+        <h2>Layers</h2>
+        <label class="check"><input type="checkbox" id="lyrPoints" checked> Places and sites</label>
+        <label class="check"><input type="checkbox" id="lyrTrails" checked> Trails and routes</label>
+        <label class="check"><input type="checkbox" id="lyrAreas" checked> Areas and boundaries</label>
+      </section>
+
+      <section id="contributeSection" hidden>
+        <h2>Contribute</h2>
+        <button type="button" class="contribute-btn" id="contributeBtn">+ Add a photo or story</button>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul class="legend" id="legendVerif"></ul>
+      </section>
+
+      <section>
+        <h2>Place type</h2>
+        <ul class="legend" id="legendCat"></ul>
+      </section>
+
+      <section>
+        <h2>Boundary precision</h2>
+        <ul class="legend" id="legendPrecision"></ul>
+      </section>
+
+      <p class="fine">Prototype note: the access levels here hide and show information in your browser to demonstrate the idea. A real platform would enforce them on a secure server.</p>
+      <p class="fine">This pilot mirrors City Media's Social Impact Lab model: one community and one project, proven well before others join, with what is learned able to be archived and shared with the next community on the platform. The access tiers and ownership language throughout follow OCAP (ownership, control, access and possession) principles.</p>
+    </aside>
+
+    <main class="mapwrap">
+      <div id="map" aria-label="Interactive map"></div>
+      <div class="offline" id="offline" hidden>Basemap tiles could not load. Showing a plain background. Features still work.</div>
+    </main>
+
+    <aside class="card" id="card" aria-live="polite" hidden></aside>
+  </div>
+
+  <button class="panel-toggle" id="panelToggle" aria-label="Show or hide controls">Menu</button>
+
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
