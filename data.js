@@ -7,21 +7,29 @@
   To add a record: copy an entry in RECORDS, give it a new id, then add a matching
   geometry entry in FEATURES (same id). Nothing else needs to change.
 
-  Access levels (lowest to highest): public, member, elder, admin, restricted.
+  Access levels (lowest to highest): public, member, elder, admin.
   A record's "minTier" decides who sees it on the map at all.
   Each section's "minTier" decides who sees that piece of detail inside the record.
+
+  "Restricted" is NOT one of these levels. It used to sit above admin as a fifth rank, but that
+  was backwards: the two Protected Site records still said "Details withheld" even at that top
+  level, because Restricted really describes content held for specific named individuals the
+  community chooses, not a rank you climb past administrator to unlock. It's modelled per record
+  now (see P07/P08's "namedAccess" field) instead of as a tier. TIER_INFO.restricted is kept only
+  as a label for the sharing-level dropdown in the Contribute/Attach forms, where "restricted" is
+  a sensitivity a submitter can flag, not a rank -- it must never be used as a minTier.
 */
 
 window.WAYBACK = {
 
-  TIERS: ["public", "member", "elder", "admin", "restricted"],
+  TIERS: ["public", "member", "elder", "admin"],
 
   TIER_INFO: {
     public:     { label: "Public",                 blurb: "Anyone visiting the site. Sees only what has been approved for general sharing." },
     member:     { label: "Community member",       blurb: "Verified community members. Sees community-level knowledge and locations." },
-    elder:      { label: "Elder / Knowledge keeper", blurb: "Elders and knowledge keepers. Sees teachings and place detail held by the community." },
+    elder:      { label: "Elder / Knowledge keeper", blurb: "Elders and knowledge keepers. Sees teachings and place detail held by the community, and can confirm community-reported records." },
     admin:      { label: "Administrator",          blurb: "Platform administrators. Sees review notes and submissions waiting for approval." },
-    restricted: { label: "Restricted",             blurb: "Highest sensitivity. Sacred, ceremonial or otherwise protected knowledge, for named individuals only." }
+    restricted: { label: "Restricted",             blurb: "Not a rank in the ladder above. A sensitivity flag meaning a record should go only to specific named individuals, decided case by case by the community." }
   },
 
   VERIFICATION: {
@@ -132,24 +140,30 @@ window.WAYBACK = {
     },
 
     P07: {
-      title: "Protected Site A", category: "protected", minTier: "restricted",
+      title: "Protected Site A", category: "protected", minTier: "admin",
       verification: "verified",
       source: "Synthetic placeholder",
       reviewer: "Reviewer B (fictional)", reviewed: "2026-09-02",
-      note: "Included only to show the highest access level. No real site is described.",
+      note: "Illustrates a named-individual-only record. Not tied to a rank in the access ladder, so administrator is as far up as this demo can show it from.",
+      /* Example names only, standing in for whoever a community would actually name. In a real
+         platform this list is what decides visibility, not a role in TIERS. */
+      namedAccess: ["(example) a designated Elder", "(example) two named family members"],
       sections: [
-        { minTier: "restricted", label: "Details withheld", text: "This entry stands in for knowledge that a community would keep restricted. In a real platform, the community decides who is named to see it, and nothing about it would appear at lower levels." }
+        { minTier: "admin", label: "Restricted: named individuals only", text: "This record isn't gated by the role ladder above it. It's restricted to specific people the community names, decided case by case, the same way the Contribute form's \"Restricted\" option describes it. In a real platform, only those named people, not every administrator, would see the content below. This demo view shows what that would look like." },
+        { minTier: "admin", label: "Example of what's withheld", text: "A placeholder description of a practice or place that would sit here. No real site or knowledge is described." }
       ]
     },
 
     P08: {
-      title: "Protected Site B", category: "protected", minTier: "restricted",
+      title: "Protected Site B", category: "protected", minTier: "admin",
       verification: "community",
       source: "Synthetic placeholder",
       reviewer: "Not yet reviewed", reviewed: "",
-      note: "Second example of a restricted item, with a different verification status.",
+      note: "Second named-individual-only example, with a different verification status.",
+      namedAccess: ["(example) one named knowledge keeper"],
       sections: [
-        { minTier: "restricted", label: "Details withheld", text: "Placeholder for a restricted record awaiting review. No real site is described." }
+        { minTier: "admin", label: "Restricted: named individuals only", text: "Same idea as Protected Site A: restricted to people the community names, not to a rank in the ladder. Awaiting community review before anyone, named or otherwise, would see real content here." },
+        { minTier: "admin", label: "Example of what's withheld", text: "Placeholder for a restricted record awaiting review. No real site is described." }
       ]
     },
 
@@ -369,6 +383,21 @@ window.WAYBACK = {
       versions: [
         { date: "2026-10-02", change: "Four separate invented registration documents entered as Unverified, scattered across different dates.", by: "Team (fictional)" },
         { date: "2026-10-18", change: "Consolidated into a single Verified timeline after cross-checking the dates against each other.", by: "Reviewer B (fictional)" }
+      ],
+      /* "Play this trapline's story" (see app.js buildTraplineStory): the same four timeline
+         chapters above, as a guided flythrough rather than a table. Reuses the real Trapline
+         Cabin photo (P09, itself single-source/unverified -- the story stays honest about
+         that) and the existing Winter Trail to the Ridge location. Each chapter keeps its own
+         verification status, since not all four are proven the same way. */
+      trapline: [
+        { period: "1962 to 1984", place: "Trapline Cabin", center: [-122.88, 58.12], zoom: 13.5,
+          note: "Registered to Holder A (fictional), passed down within one family.", verification: "unverified", img: "P09" },
+        { period: "1984 to 2003", place: "Winter Trail to the Ridge", center: [-122.78, 58.15], zoom: 12.5,
+          note: "Transferred to Holder B (fictional) after a formal registration change.", verification: "verified" },
+        { period: "2003 to 2019", place: "Across the registration area", center: [-122.85, 58.09], zoom: 12,
+          note: "Lapsed and re-registered to Holder C (fictional) following a gap in renewal.", verification: "contested" },
+        { period: "2019 to present", place: "The whole trapline area", bounds: true,
+          note: "Reinstatement in progress, the kind of process that previously took months of manual record searches.", verification: "community" }
       ],
       sections: [
         { minTier: "member", label: "About this area", text: "An invented trapline area illustrating how BC's real trapline registration system, where licences are registered, transferred and occasionally lapse over decades, could be represented once its history is gathered in one place. The outline and every name below are fictional.", timeline: [

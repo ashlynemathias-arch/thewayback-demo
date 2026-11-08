@@ -245,31 +245,143 @@
     return wrap;
   }
 
+  /* ---------- speak to contribute: an optional voice draft of the form below, for anyone who'd
+     rather talk than type (the note behind this: many Elders won't type into a web form, and
+     that could decide whether a platform like this gets used at all). Uses the Web Speech API
+     built into Chrome, free and keyless -- but unlike everything else in this prototype, that
+     API is NOT purely local: Chrome sends the audio to Google's servers to turn it into text,
+     the one place this demo doesn't clear the "no Google" bar the rest of it holds to. Said
+     here for transparency, not glossed over. A real platform would need an on-device or
+     self-hosted speech model instead. Nothing drafted here is submitted until the person checks
+     every field and approves it, the same two checkboxes and Submit button as typing it in
+     directly, and the field-filling is a handful of keyword rules, not real understanding --
+     both of which this says on screen too. ---------- */
+  function buildSpeakToContribute(fields) {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var wrap = el("div", "uploaddemo");
+    var status = el("p", "uploaddemo-caption", "");
+    var heard = el("p", "journey-note", "");
+    heard.hidden = true;
+
+    if (!SR) {
+      status.textContent = "Voice input isn't supported in this browser (it needs Chrome's built-in speech recognition). Just type into the form below instead.";
+      wrap.appendChild(status);
+      return wrap;
+    }
+
+    var recognizing = false;
+    var recog = new SR();
+    recog.lang = "en-US";
+    recog.interimResults = false;
+    recog.maxAlternatives = 1;
+
+    var micBtn = el("button", "uploaddemo-btn primary", "🎤 Speak to contribute");
+    micBtn.type = "button";
+
+    function fillFromTranscript(text) {
+      var lower = text.toLowerCase();
+
+      var type = "story";
+      if (/\b(photo|picture|image)\b/.test(lower)) type = "photo";
+      else if (/\bvideo\b/.test(lower)) type = "video";
+      else if (/\b(recording|audio|sound)\b/.test(lower)) type = "audio";
+
+      var tier = "member";
+      if (/\b(sacred|ceremonial|private|restricted|named)\b/.test(lower)) tier = "restricted";
+      else if (/\b(elder|knowledge keeper)s?\b/.test(lower)) tier = "elder";
+
+      var seasonMatch = lower.match(/\b(spring|summer|fall|autumn|winter)\b/);
+      var placeMatch = lower.match(/\b(?:near|at|by|along|up at|down at)\s+([a-z' ]{3,30})/);
+      var place = [seasonMatch ? seasonMatch[1] : null, placeMatch ? placeMatch[1].trim() : null].filter(Boolean).join(", ");
+
+      var firstClause = text.split(/[.!?]/)[0].trim();
+      var title = firstClause.length > 60 ? firstClause.slice(0, 57) + "..." : firstClause;
+      if (title) title = title.charAt(0).toUpperCase() + title.slice(1);
+
+      fields.typeSel.value = type;
+      fields.titleInput.value = title;
+      if (fields.placeInput) fields.placeInput.value = place;
+      fields.descInput.value = text;
+      fields.tierSel.value = tier;
+      fields.tierSel.dispatchEvent(new Event("change"));
+      fields.titleInput.dispatchEvent(new Event("input"));
+      fields.descInput.dispatchEvent(new Event("input"));
+
+      heard.hidden = false;
+      heard.textContent = "Heard: “" + text + "” — title, type, place/season and sharing level below were drafted from this with a few keyword rules, not real understanding. Check and edit every field, especially the sharing level, before submitting.";
+    }
+
+    recog.onresult = function (e) { fillFromTranscript(e.results[0][0].transcript); };
+    recog.onerror = function () {
+      status.textContent = "Didn't catch that clearly. Tap the button and try again, or just type below.";
+      recognizing = false;
+      micBtn.textContent = "🎤 Speak to contribute";
+    };
+    recog.onend = function () {
+      recognizing = false;
+      micBtn.textContent = "🎤 Speak to contribute";
+    };
+
+    micBtn.addEventListener("click", function () {
+      if (recognizing) { recog.stop(); return; }
+      recognizing = true;
+      micBtn.textContent = "🔴 Listening… tap to stop";
+      status.textContent = "";
+      recog.start();
+    });
+
+    wrap.appendChild(micBtn);
+    wrap.appendChild(el("p", "uploaddemo-caption", "Describe the place out loud and this drafts the fields below. Nothing is submitted until you check it and press Submit yourself, same as typing it in."));
+    wrap.appendChild(el("p", "uploaddemo-caption", "Note: this uses Chrome's built-in speech recognition, which sends the recording to Google to turn it into text. Unlike the rest of this prototype, that step isn't local or Google-free. A real version would need its own speech model instead."));
+    wrap.appendChild(status);
+    wrap.appendChild(heard);
+    return wrap;
+  }
+
   /* ---------- community contribute form: members add their own content, gated by safeguards ---------- */
   var submitCounter = 0;
 
   function buildContributeForm() {
     var wrap = el("div", "contribform");
 
-    wrap.appendChild(el("label", null, "What are you sharing?"));
     var typeSel = document.createElement("select");
     [["photo", "A photo"], ["story", "A story or account (text)"], ["audio", "An audio recording"], ["video", "A video"]].forEach(function (o) {
       var opt = document.createElement("option");
       opt.value = o[0]; opt.textContent = o[1];
       typeSel.appendChild(opt);
     });
-    wrap.appendChild(typeSel);
 
-    wrap.appendChild(el("label", null, "Title"));
     var titleInput = document.createElement("input");
     titleInput.type = "text";
     titleInput.placeholder = "Short title";
-    wrap.appendChild(titleInput);
 
-    wrap.appendChild(el("label", null, "Tell us about it"));
+    var placeInput = document.createElement("input");
+    placeInput.type = "text";
+    placeInput.placeholder = "Where, or what season (optional)";
+
     var descInput = document.createElement("textarea");
     descInput.rows = 4;
     descInput.placeholder = "A sentence or two about what this is and where it's from.";
+
+    var tierSel = document.createElement("select");
+    [["member", "Community members and above"], ["elder", "Elders and knowledge keepers and above"], ["restricted", "Restricted: named individuals only"]].forEach(function (o) {
+      var opt = document.createElement("option");
+      opt.value = o[0]; opt.textContent = o[1];
+      tierSel.appendChild(opt);
+    });
+
+    wrap.appendChild(buildSpeakToContribute({ typeSel: typeSel, titleInput: titleInput, placeInput: placeInput, descInput: descInput, tierSel: tierSel }));
+
+    wrap.appendChild(el("label", null, "What are you sharing?"));
+    wrap.appendChild(typeSel);
+
+    wrap.appendChild(el("label", null, "Title"));
+    wrap.appendChild(titleInput);
+
+    wrap.appendChild(el("label", null, "Where, or what season"));
+    wrap.appendChild(placeInput);
+
+    wrap.appendChild(el("label", null, "Tell us about it"));
     wrap.appendChild(descInput);
 
     /* Reuses the same confirm-before-it-goes-anywhere pattern as the admin review example,
@@ -282,12 +394,6 @@
     wrap.appendChild(attach.previewWrap);
 
     wrap.appendChild(el("label", null, "Who should eventually be able to see this?"));
-    var tierSel = document.createElement("select");
-    [["member", "Community members and above"], ["elder", "Elders and knowledge keepers and above"], ["restricted", "Restricted: named individuals only"]].forEach(function (o) {
-      var opt = document.createElement("option");
-      opt.value = o[0]; opt.textContent = o[1];
-      tierSel.appendChild(opt);
-    });
     wrap.appendChild(tierSel);
 
     var check1 = document.createElement("input");
@@ -352,13 +458,16 @@
           { minTier: "admin", label: "Reviewer actions", text: "Accept, request more information, or decline. (Buttons are not active in the prototype.)" }
         ]
       };
+      if (placeInput.value.trim()) {
+        D.RECORDS[id].sections.splice(1, 0, { minTier: "admin", label: "Where, or what season", text: placeInput.value.trim() });
+      }
       D.FEATURES.points[id] = coord;
 
       refreshMapData();
       renderItems();
 
       status.textContent = "Submitted for review. An administrator will check this before anything here is shared more widely, at whatever level is approved, not necessarily the level suggested above.";
-      [typeSel, titleInput, descInput, tierSel, attach.fileInputEl, check1, check2, submitBtn].forEach(function (f) { f.disabled = true; });
+      [typeSel, titleInput, placeInput, descInput, tierSel, attach.fileInputEl, check1, check2, submitBtn].forEach(function (f) { f.disabled = true; });
     });
 
     var actions = el("div", "uploaddemo-actions");
@@ -405,6 +514,77 @@
     wrap.appendChild(actions);
     wrap.appendChild(el("p", "journey-note", "Representative photos of the surrounding terrain, not actual photographs of this trail."));
     render();
+    return wrap;
+  }
+
+  /* ---------- trapline story: a boundary's own registration timeline, played as a guided
+     flythrough instead of read as a table. Tilts into 3D terrain and flies the camera to
+     each chapter's place; the AI's only role is sequencing the four scattered records and
+     writing the connecting captions, which is why each chapter still carries its own
+     verification badge rather than one blanket status for the whole story. ---------- */
+  function buildTraplineStory(id, stops) {
+    var wrap = el("div", "journey");
+    var idx = 0;
+    var counter = el("p", "journey-counter", "");
+    var imgEl = document.createElement("img");
+    imgEl.className = "journey-img";
+    var caption = el("p", "journey-caption");
+    var badgeHolder = el("div");
+    badgeHolder.style.marginTop = "6px";
+
+    function flyToStop(stop) {
+      if (!map) return;
+      if (!state.terrain3d) setTerrain3D(true);
+      if (stop.bounds) {
+        var coords = D.FEATURES.polygons[id];
+        var b = new maplibregl.LngLatBounds(coords[0], coords[0]);
+        coords.forEach(function (c) { b.extend(c); });
+        map.fitBounds(b, { padding: 70, maxZoom: 12, pitch: 55, bearing: -17, duration: 1100 });
+      } else {
+        map.easeTo({ center: stop.center, zoom: stop.zoom || 13, pitch: 55, bearing: -17, duration: 1100 });
+      }
+    }
+
+    function render(fly) {
+      var stop = stops[idx];
+      counter.textContent = "Chapter " + (idx + 1) + " of " + stops.length;
+      imgEl.onerror = null;
+      if (stop.img) {
+        imgEl.hidden = false;
+        var fallback = placeholderImage(id + "-trapline-" + idx);
+        imgEl.src = "media/" + stop.img + ".jpg";
+        imgEl.alt = stop.place;
+        imgEl.onerror = function () { imgEl.onerror = null; imgEl.src = fallback; };
+      } else {
+        imgEl.hidden = true;
+      }
+      caption.textContent = "";
+      caption.appendChild(el("strong", null, stop.period + " — " + stop.place + ". "));
+      caption.appendChild(document.createTextNode(stop.note));
+      badgeHolder.textContent = "";
+      if (stop.verification) badgeHolder.appendChild(badge(stop.verification));
+      if (fly) flyToStop(stop);
+    }
+
+    var prevBtn = el("button", "uploaddemo-btn", "‹ Back");
+    var nextBtn = el("button", "uploaddemo-btn primary", "Forward ›");
+    prevBtn.type = "button";
+    nextBtn.type = "button";
+    prevBtn.addEventListener("click", function () { idx = (idx - 1 + stops.length) % stops.length; render(true); });
+    nextBtn.addEventListener("click", function () { idx = (idx + 1) % stops.length; render(true); });
+
+    var actions = el("div", "uploaddemo-actions");
+    actions.appendChild(prevBtn);
+    actions.appendChild(nextBtn);
+
+    wrap.appendChild(counter);
+    wrap.appendChild(imgEl);
+    wrap.appendChild(caption);
+    wrap.appendChild(badgeHolder);
+    wrap.appendChild(actions);
+    wrap.appendChild(el("p", "journey-note",
+      "The AI's part here was sequencing these four scattered registration records and writing the captions connecting them. The order was approved before anyone else saw it, every name is fictional, and the photo is the same single-source Trapline Cabin image shown elsewhere, still marked unverified here too."));
+    render(true);
     return wrap;
   }
 
@@ -913,6 +1093,33 @@
     /* Only accounts at member level or above (not anonymous public visitors) can contribute. */
     var cs = document.getElementById("contributeSection");
     if (cs) cs.hidden = !canSee("member");
+    renderElderQueue();
+  }
+
+  /* ---------- Elder review queue: every currently-visible, still-unconfirmed community-reported
+     record, in one place, so an Elder doesn't have to hunt the map for what needs confirming. ---------- */
+  function renderElderQueue() {
+    var section = document.getElementById("elderQueueSection");
+    var list = document.getElementById("elderQueue");
+    if (!section || !list) return;
+    if (!canSee("elder")) { section.hidden = true; return; }
+
+    list.textContent = "";
+    var count = 0;
+    Object.keys(D.RECORDS).forEach(function (id) {
+      var r = D.RECORDS[id];
+      if (!canSee(r.minTier)) return;
+      if (r.verification !== "community") return;
+      count++;
+      var li = el("li");
+      var b = el("button", "itembtn", r.title);
+      b.type = "button";
+      b.addEventListener("click", function () { openRecord(id, true); });
+      li.appendChild(badge(r.verification, true));
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    section.hidden = count === 0;
   }
 
   function renderItems() {
@@ -1033,11 +1240,40 @@
         "More detail exists for this record at a higher access level (" + hiddenCount + " section" + (hiddenCount > 1 ? "s" : "") + " not shown)."));
     }
 
+    if (r.namedAccess && r.namedAccess.length && canSee("admin")) {
+      var nasec = el("section", "sec");
+      var nah = el("h4", null, "Named access (example) ");
+      nah.appendChild(el("span", "tierhint", "(" + D.TIER_INFO.admin.label + " and above)"));
+      nasec.appendChild(nah);
+      nasec.appendChild(el("p", null, "Restricted here means specific named people, not a rank above this one. These are placeholder names standing in for whoever a community would actually name:"));
+      var nal = el("ul", "legend");
+      r.namedAccess.forEach(function (name) { nal.appendChild(el("li", null, name)); });
+      nasec.appendChild(nal);
+      body.appendChild(nasec);
+    }
+
     if (r.journey && r.journey.length) {
       var jsec = el("section", "sec");
       jsec.appendChild(el("h4", null, "Walk the trail"));
       jsec.appendChild(buildJourney(id, r.journey));
       body.appendChild(jsec);
+    }
+
+    if (r.trapline && r.trapline.length) {
+      var tsec = el("section", "sec");
+      tsec.appendChild(el("h4", null, "The life of this trapline"));
+      tsec.appendChild(el("p", null, "This area's registration history, told as a guided flythrough through its four chapters instead of read as a table."));
+      var playBtn = el("button", "uploaddemo-btn primary", "Play this trapline's story");
+      playBtn.type = "button";
+      var storyHolder = el("div");
+      playBtn.addEventListener("click", function () {
+        storyHolder.textContent = "";
+        storyHolder.appendChild(buildTraplineStory(id, r.trapline));
+        playBtn.hidden = true;
+      });
+      tsec.appendChild(playBtn);
+      tsec.appendChild(storyHolder);
+      body.appendChild(tsec);
     }
 
     if (r.precision) {
@@ -1074,6 +1310,26 @@
       dl.appendChild(dd);
     });
     src.appendChild(dl);
+
+    /* Elder confirmation: the brief and Katherine's feedback both centre verification on Elders
+       actually confirming things, not just seeing more than everyone else. Before this, only
+       Administrators could act on a record; Elders could view but never do anything. This makes
+       confirming a real (if client-side only) action, visible to Elder and above, on any
+       community-reported record they can already see. */
+    if (r.verification === "community" && canSee("elder")) {
+      var confirmBtn = el("button", "uploaddemo-btn primary", "Confirm this record (Elder review)");
+      confirmBtn.type = "button";
+      confirmBtn.style.marginTop = "10px";
+      confirmBtn.addEventListener("click", function () {
+        r.verification = "verified";
+        r.verifiedBy = "An Elder (demo action)";
+        r.reviewed = new Date().toISOString().slice(0, 10);
+        refreshMapData();
+        renderCard(id);
+      });
+      src.appendChild(confirmBtn);
+    }
+
     body.appendChild(src);
 
     if (r.versions && r.versions.length && canSee("admin")) {
