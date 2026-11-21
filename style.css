@@ -102,6 +102,20 @@ body {
 .landing-btn-arrow { transition: transform .15s ease; }
 .landing-btn:hover .landing-btn-arrow { transform: translateX(3px); }
 
+.landing-roles { margin-top: 22px; }
+.landing-roles-label {
+  margin: 0 0 9px; font-size: 12px; font-weight: 600; letter-spacing: .03em;
+  text-transform: uppercase; color: rgba(255,255,255,.62);
+}
+.landing-roles-row { display: flex; flex-wrap: wrap; gap: 9px; }
+.landing-role-btn {
+  background: rgba(255,255,255,.08); color: #fff; border: 1.5px solid rgba(255,255,255,.4);
+  padding: 8px 15px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.landing-role-btn:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.7); transform: translateY(-1px); }
+.landing-role-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
 .landing-scroll-cue {
   align-self: center; margin-bottom: 16px; background: none; border: none; cursor: pointer; padding: 10px;
   opacity: .8;

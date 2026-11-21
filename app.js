@@ -1336,6 +1336,7 @@
   }
 
   function refreshMapData() {
+    if (!map) return;
     buildDataLayers();
   }
 
@@ -1773,6 +1774,24 @@
         landingEl.scrollTop = 0;
       }
     });
+
+    /* "Jump straight in as" on the homepage: picks a role and enters the map in one
+       click, instead of requiring a generic "Enter the map" click followed by a
+       separate role click in the sidebar once inside. */
+    var landingRolesWrap = document.getElementById("landingRoles");
+    if (landingRolesWrap) {
+      TIERS.forEach(function (t) {
+        var b = el("button", "landing-role-btn", D.TIER_INFO[t].label);
+        b.type = "button";
+        b.dataset.role = t;
+        b.addEventListener("click", function () {
+          setRole(t);
+          landingEl.classList.add("hidden");
+          if (map) map.resize();
+        });
+        landingRolesWrap.appendChild(b);
+      });
+    }
 
     /* Reveal the three feature cards as they scroll into view, instead of
        them just sitting there already visible. Starts them hidden only once
