@@ -8,7 +8,7 @@
      plainer "positron" style used before. Still OpenFreeMap: free, no key, no Google. */
   var STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
-  var state = { role: "public", selected: null, basemap: "map", terrain3d: false, pickingLocation: false, layers: { points: true, trails: true, areas: true } };
+  var state = { role: "public", roleLocked: false, selected: null, basemap: "map", terrain3d: false, pickingLocation: false, layers: { points: true, trails: true, areas: true } };
   /* The one pending "click the map to set a location" listener, if any -- tracked here (not just
      inside the form that created it) so closing the card mid-pick can cancel it, instead of
      leaving a stray listener that plants an orphaned pin on whatever's clicked next. */
@@ -1356,18 +1356,47 @@
   }
 
   /* ---------- panel ---------- */
+  /* Shows the homepage again. Used both by the sidebar's Home button and by the
+     "Change view" link that appears once a role has been locked in from the homepage. */
+  function goHome() {
+    var landingEl = document.getElementById("landing");
+    if (landingEl) {
+      landingEl.classList.remove("hidden");
+      landingEl.scrollTop = 0;
+    }
+  }
+
   function renderRoles() {
     var wrap = document.getElementById("roles");
+    var heading = document.getElementById("viewAsHeading");
     wrap.textContent = "";
-    TIERS.forEach(function (t) {
-      var b = el("button", null, D.TIER_INFO[t].label);
-      b.type = "button";
-      b.setAttribute("role", "radio");
-      b.setAttribute("aria-checked", String(state.role === t));
-      b.dataset.role = t;
-      b.addEventListener("click", function () { setRole(t); });
-      wrap.appendChild(b);
-    });
+    if (state.roleLocked) {
+      /* Entered via a homepage "jump straight in as" button: this session only sees
+         that one tier, the way a real signed-in account only sees its own access
+         level. Switching tiers means going back to the homepage and picking again. */
+      if (heading) heading.textContent = "Viewing as";
+      wrap.classList.add("roles--locked");
+      var chip = el("div", "role-locked-chip");
+      chip.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+      chip.appendChild(el("span", null, D.TIER_INFO[state.role].label));
+      wrap.appendChild(chip);
+      var changeBtn = el("button", "role-locked-change", "Change view →");
+      changeBtn.type = "button";
+      changeBtn.addEventListener("click", goHome);
+      wrap.appendChild(changeBtn);
+    } else {
+      if (heading) heading.textContent = "View as";
+      wrap.classList.remove("roles--locked");
+      TIERS.forEach(function (t) {
+        var b = el("button", null, D.TIER_INFO[t].label);
+        b.type = "button";
+        b.setAttribute("role", "radio");
+        b.setAttribute("aria-checked", String(state.role === t));
+        b.dataset.role = t;
+        b.addEventListener("click", function () { setRole(t); });
+        wrap.appendChild(b);
+      });
+    }
   }
 
   function renderLegends() {
@@ -1758,6 +1787,10 @@
     var landingEnterBtns = document.querySelectorAll(".landing-enter");
     for (var le = 0; le < landingEnterBtns.length; le++) {
       landingEnterBtns[le].addEventListener("click", function () {
+        /* Generic entry (not a specific role button): always leaves the full
+           tier switcher unlocked, even if a previous visit had locked it. */
+        state.roleLocked = false;
+        renderRoles();
         landingEl.classList.add("hidden");
         if (map) map.resize();
       });
@@ -1768,16 +1801,12 @@
       if (features) features.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     var panelHomeBtn = document.getElementById("panelHomeBtn");
-    if (panelHomeBtn) panelHomeBtn.addEventListener("click", function () {
-      if (landingEl) {
-        landingEl.classList.remove("hidden");
-        landingEl.scrollTop = 0;
-      }
-    });
+    if (panelHomeBtn) panelHomeBtn.addEventListener("click", goHome);
 
-    /* "Jump straight in as" on the homepage: picks a role and enters the map in one
-       click, instead of requiring a generic "Enter the map" click followed by a
-       separate role click in the sidebar once inside. */
+    /* "Jump straight in as" on the homepage: picks a role, locks this visit to just
+       that tier (mirroring how a real signed-in account would only ever see its own
+       access level), and enters the map in one click. "Change view" in the sidebar,
+       or the Home button, comes back here to pick a different one. */
     var landingRolesWrap = document.getElementById("landingRoles");
     if (landingRolesWrap) {
       TIERS.forEach(function (t) {
@@ -1785,6 +1814,7 @@
         b.type = "button";
         b.dataset.role = t;
         b.addEventListener("click", function () {
+          state.roleLocked = true;
           setRole(t);
           landingEl.classList.add("hidden");
           if (map) map.resize();
