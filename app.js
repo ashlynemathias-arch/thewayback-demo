@@ -8,7 +8,17 @@
      plainer "positron" style used before. Still OpenFreeMap: free, no key, no Google. */
   var STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
-  var state = { role: "public", selected: null, basemap: "map", terrain3d: false, layers: { points: true, trails: true, areas: true } };
+  var state = { role: "public", selected: null, basemap: "map", terrain3d: false, pickingLocation: false, layers: { points: true, trails: true, areas: true } };
+  /* The one pending "click the map to set a location" listener, if any -- tracked here (not just
+     inside the form that created it) so closing the card mid-pick can cancel it, instead of
+     leaving a stray listener that plants an orphaned pin on whatever's clicked next. */
+  var pendingLocationPick = null;
+  function cancelLocationPick() {
+    if (pendingLocationPick && map) map.off("click", pendingLocationPick);
+    pendingLocationPick = null;
+    state.pickingLocation = false;
+    if (map) map.getCanvas().style.cursor = "";
+  }
 
   /* ---------- helpers ---------- */
   function el(tag, cls, text) {
@@ -341,6 +351,136 @@
   /* ---------- community contribute form: members add their own content, gated by safeguards ---------- */
   var submitCounter = 0;
 
+  /* ---------- where is this?: a new submission used to be dropped at a random spot near the
+     map center regardless of what the submitter actually meant. This lets them either point
+     right at it (click the map) or say they don't know the exact spot yet, in which case the
+     record still goes in, but flagged as approximate so a reviewer knows to confirm the real
+     location before anyone relies on it. ---------- */
+  function buildLocationPicker(onChange) {
+    onChange = onChange || function () {};
+    var wrap = el("div", "uploaddemo");
+    var mode = null; // "exact" | "unsure"
+    var coord = null;
+    var marker = null;
+
+    var exactLabel = el("label", "check");
+    var exactRadio = document.createElement("input");
+    exactRadio.type = "radio"; exactRadio.name = "locMode" + Date.now();
+    exactLabel.appendChild(exactRadio);
+    exactLabel.appendChild(el("span", null, "I know exactly where this is"));
+
+    var unsureLabel = el("label", "check");
+    var unsureRadio = document.createElement("input");
+    unsureRadio.type = "radio"; unsureRadio.name = exactRadio.name;
+    unsureLabel.appendChild(unsureRadio);
+    unsureLabel.appendChild(el("span", null, "I'm not sure of the exact spot yet"));
+
+    var pickBtn = el("button", "uploaddemo-btn", "Click to drop a pin on the map");
+    pickBtn.type = "button";
+    pickBtn.hidden = true;
+    var status = el("p", "uploaddemo-caption", "");
+
+    function clearMarker() { if (marker) { marker.remove(); marker = null; } }
+
+    function startPick() {
+      if (!map) { status.textContent = "Map isn't ready yet."; return; }
+      cancelLocationPick(); // in case a previous pick on this same form was left hanging
+      pickBtn.disabled = true;
+      pickBtn.textContent = "Click anywhere on the map…";
+      map.getCanvas().style.cursor = "crosshair";
+      /* Suppresses the normal click-to-open-a-record behaviour for this one click, so pinning a
+         new submission on top of an existing point, trail or boundary doesn't instead open that
+         record and wipe out the form in progress. */
+      state.pickingLocation = true;
+      pendingLocationPick = function (e) {
+        map.off("click", pendingLocationPick);
+        pendingLocationPick = null;
+        state.pickingLocation = false;
+        pickBtn.disabled = false;
+        pickBtn.textContent = "Change location";
+        map.getCanvas().style.cursor = "";
+        coord = [e.lngLat.lng, e.lngLat.lat];
+        clearMarker();
+        marker = new maplibregl.Marker({ color: "#b5533c" }).setLngLat(coord).addTo(map);
+        status.textContent = "Location set: " + coord[1].toFixed(4) + ", " + coord[0].toFixed(4) + ". Click the button again to change it.";
+        onChange();
+      };
+      map.on("click", pendingLocationPick);
+    }
+    pickBtn.addEventListener("click", startPick);
+
+    [exactRadio, unsureRadio].forEach(function (r) {
+      r.addEventListener("change", function () {
+        mode = r.value || (r === exactRadio ? "exact" : "unsure");
+        pickBtn.hidden = r !== exactRadio;
+        if (r === unsureRadio) {
+          clearMarker();
+          coord = null;
+          status.textContent = "This will go in as an approximate pin near the general area, flagged for someone to confirm the real spot before it's relied on.";
+        } else {
+          status.textContent = coord
+            ? ("Location set: " + coord[1].toFixed(4) + ", " + coord[0].toFixed(4) + ".")
+            : "Click the button below, then click the map where this is.";
+        }
+        onChange();
+      });
+    });
+    mode = null;
+    exactRadio.value = "exact"; unsureRadio.value = "unsure";
+
+    wrap.appendChild(el("p", null, "Where is this?"));
+    wrap.appendChild(exactLabel);
+    wrap.appendChild(unsureLabel);
+    wrap.appendChild(pickBtn);
+    wrap.appendChild(status);
+
+    return {
+      el: wrap,
+      isReady: function () { return mode === "unsure" || (mode === "exact" && !!coord); },
+      getLocation: function () {
+        if (mode === "exact" && coord) return { coord: coord, exact: true };
+        var center = D.MAP_VIEW.center;
+        return { coord: [center[0] + (Math.random() - 0.5) * 0.08, center[1] + (Math.random() - 0.5) * 0.08], exact: false };
+      },
+      removePreviewMarker: clearMarker,
+      disable: function () { exactRadio.disabled = true; unsureRadio.disabled = true; pickBtn.disabled = true; }
+    };
+  }
+
+  /* ---------- optional name + anonymous option, shared by the Contribute and Attach forms: a
+     community member raised this directly about sharing good harvesting locations, people may
+     want to flag something without their name attached to it, even from administrators. ---------- */
+  function buildIdentityField() {
+    var wrap = el("div", "uploaddemo");
+    wrap.appendChild(el("label", null, "Your name (optional)"));
+    var nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.placeholder = "Shown to administrators only, never to other members";
+    wrap.appendChild(nameInput);
+
+    var anonLabel = el("label", "check");
+    var anonCheck = document.createElement("input");
+    anonCheck.type = "checkbox";
+    anonLabel.appendChild(anonCheck);
+    anonLabel.appendChild(el("span", null, "Submit this anonymously (not even administrators will see who submitted it)"));
+    wrap.appendChild(anonLabel);
+
+    anonCheck.addEventListener("change", function () {
+      nameInput.disabled = anonCheck.checked;
+      if (anonCheck.checked) nameInput.value = "";
+    });
+
+    return {
+      el: wrap,
+      getSubmitterLine: function () {
+        if (anonCheck.checked) return "Anonymous (identity withheld, even from administrators)";
+        var n = nameInput.value.trim();
+        return n ? (n + " (visible to administrators only)") : "Not given (visible to administrators only)";
+      },
+      disable: function () { nameInput.disabled = true; anonCheck.disabled = true; }
+    };
+  }
+
   function buildContributeForm() {
     var wrap = el("div", "contribform");
 
@@ -384,6 +524,12 @@
     wrap.appendChild(el("label", null, "Tell us about it"));
     wrap.appendChild(descInput);
 
+    var locationPicker = buildLocationPicker(function () { refreshEnabled(); });
+    wrap.appendChild(locationPicker.el);
+
+    var identity = buildIdentityField();
+    wrap.appendChild(identity.el);
+
     /* Reuses the same confirm-before-it-goes-anywhere pattern as the admin review example,
        so a wrong file can be caught before submitting, not after. The file itself is real
        (held only as an in-memory object URL in this tab); nothing is actually uploaded
@@ -423,7 +569,7 @@
     submitBtn.disabled = true;
 
     function refreshEnabled() {
-      submitBtn.disabled = !(titleInput.value.trim() && descInput.value.trim() && check1.checked && check2.checked);
+      submitBtn.disabled = !(titleInput.value.trim() && descInput.value.trim() && check1.checked && check2.checked && locationPicker.isReady());
     }
     [titleInput, descInput].forEach(function (f) { f.addEventListener("input", refreshEnabled); });
     [check1, check2].forEach(function (f) { f.addEventListener("change", refreshEnabled); });
@@ -441,33 +587,43 @@
         mediaItem = { type: mediaKind, caption: attached ? ("Submitted file: " + attached.name) : "Submitted by a community member through the demo's contribute form." };
         if (attached) mediaItem.url = attached.url;
       }
-      var center = D.MAP_VIEW.center;
-      var coord = [center[0] + (Math.random() - 0.5) * 0.08, center[1] + (Math.random() - 0.5) * 0.08];
+      var location = locationPicker.getLocation();
 
       D.RECORDS[id] = {
         title: titleInput.value.trim(), category: "evidence", minTier: "admin",
         verification: "unverified",
         source: "Synthetic: submitted through the demo's own contribute form",
         reviewer: "Not yet reviewed", reviewed: "",
-        note: "Added just now through the Contribute function. Visible to administrators only until reviewed, regardless of the level suggested below, which is exactly the safeguard this function demonstrates.",
+        note: location.exact
+          ? "Added just now through the Contribute function, at the exact spot the submitter marked on the map. Visible to administrators only until reviewed, regardless of the level suggested below, which is exactly the safeguard this function demonstrates."
+          : "Added just now through the Contribute function. The submitter wasn't sure of the exact spot, so this pin is approximate only and needs someone to confirm the real location before it's relied on or shown more widely.",
         sections: [
           { minTier: "admin", label: "Submission", text: descInput.value.trim(),
             media: mediaItem ? [mediaItem] : [] },
+          { minTier: "admin", label: "Submitter", text: identity.getSubmitterLine() },
           { minTier: "admin", label: "Submitter's requested sharing level", text: "Suggested for: " + D.TIER_INFO[tierSel.value].label + ". Stays visible to administrators only until reviewed." },
           { minTier: "admin", label: "Safeguards confirmed at submission", text: "Submitter confirmed permission to share, and confirmed cultural sensitivity was considered for the level picked above." },
           { minTier: "admin", label: "Reviewer actions", text: "Accept, request more information, or decline. (Buttons are not active in the prototype.)" }
         ]
       };
+      if (!location.exact) {
+        D.RECORDS[id].sections.splice(1, 0, { minTier: "admin", label: "Location needs confirming", text: "Placed near the general pilot area as a stand-in. The submitter didn't have an exact spot, so someone should follow up before this is treated as accurate." });
+      }
       if (placeInput.value.trim()) {
         D.RECORDS[id].sections.splice(1, 0, { minTier: "admin", label: "Where, or what season", text: placeInput.value.trim() });
       }
-      D.FEATURES.points[id] = coord;
+      D.FEATURES.points[id] = location.coord;
 
+      locationPicker.removePreviewMarker();
       refreshMapData();
       renderItems();
 
-      status.textContent = "Submitted for review. An administrator will check this before anything here is shared more widely, at whatever level is approved, not necessarily the level suggested above.";
+      status.textContent = location.exact
+        ? "Submitted for review. An administrator will check this before anything here is shared more widely, at whatever level is approved, not necessarily the level suggested above."
+        : "Submitted for review as an approximate location. An administrator will need to confirm the real spot before this is shared more widely.";
       [typeSel, titleInput, placeInput, descInput, tierSel, attach.fileInputEl, check1, check2, submitBtn].forEach(function (f) { f.disabled = true; });
+      locationPicker.disable();
+      identity.disable();
     });
 
     var actions = el("div", "uploaddemo-actions");
@@ -624,6 +780,9 @@
     wrap.appendChild(attach.fileInputEl);
     wrap.appendChild(attach.previewWrap);
 
+    var identity = buildIdentityField();
+    wrap.appendChild(identity.el);
+
     wrap.appendChild(el("label", null, "Who should eventually be able to see this?"));
     var tierSel = document.createElement("select");
     [["member", "Community members and above"], ["elder", "Elders and knowledge keepers and above"], ["restricted", "Restricted: named individuals only"]].forEach(function (o) {
@@ -676,6 +835,7 @@
         text: descInput.value.trim(),
         suggestedTier: tierSel.value,
         submittedAt: new Date().toISOString().slice(0, 10),
+        submittedBy: identity.getSubmitterLine(),
         fileUrl: attached ? attached.url : null,
         fileName: attached ? attached.name : null,
         fileKind: attached ? attached.kind : null
@@ -687,6 +847,7 @@
          not re-rendering the card here: that would wipe out this success message. */
       status.textContent = "Submitted for review. An administrator will check this before it's added to this record, at whatever level is approved, not necessarily the level suggested above.";
       [typeSel, titleInput, descInput, tierSel, attach.fileInputEl, check1, check2, submitBtn].forEach(function (f) { f.disabled = true; });
+      identity.disable();
     });
 
     var actions = el("div", "uploaddemo-actions");
@@ -699,6 +860,7 @@
   function openContributeForm() {
     state.selected = null;
     highlight(null);
+    cancelLocationPick();
     var c = document.getElementById("card");
     c.textContent = "";
     c.hidden = false;
@@ -714,6 +876,164 @@
     body.appendChild(el("p", null,
       "Share something to be reviewed before it's added to the map. Everything submitted here stays visible to administrators only until it's reviewed, no matter what level is suggested below."));
     body.appendChild(buildContributeForm());
+    c.appendChild(body);
+    c.scrollTop = 0;
+    if (window.matchMedia("(max-width: 900px)").matches) document.getElementById("panel").classList.remove("open");
+  }
+
+  /* ---------- a small CSV parser: enough for a flat dataset export (quoted fields with embedded
+     commas handled), nothing fancier than that. Returns { headers, rows }, each row an array
+     aligned to headers; empty if the file had nothing usable in it. ---------- */
+  function parseCsv(text) {
+    var rows = [], row = [], field = "", inQuotes = false, i = 0;
+    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    while (i < text.length) {
+      var ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += ch; i++; continue;
+      }
+      if (ch === '"') { inQuotes = true; i++; continue; }
+      if (ch === ",") { row.push(field); field = ""; i++; continue; }
+      if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+      field += ch; i++;
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    rows = rows.filter(function (r) { return r.length > 1 || (r.length === 1 && r[0].trim()); });
+    if (!rows.length) return { headers: [], rows: [] };
+    var headers = rows[0].map(function (h) { return h.trim().toLowerCase(); });
+    return { headers: headers, rows: rows.slice(1) };
+  }
+
+  /* ---------- bulk import: for a dataset handed over all at once, like a hired ecologist's
+     survey, instead of one submission at a time. Administrator-only, since a large external
+     dataset needs a human look before it's trusted -- same review-queue safeguard as a single
+     Contribute submission, just applied to many rows in one pass. ---------- */
+  var bulkCounter = 0;
+  function buildBulkImportForm() {
+    var wrap = el("div", "contribform");
+    wrap.appendChild(el("p", null, "Expects a CSV with a header row and these columns: title, description, lat, lng, and optionally type (photo/story/audio/video), season, and sharing_level (member/elder/restricted)."));
+
+    var fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".csv,text/csv";
+    wrap.appendChild(fileInput);
+
+    var preview = el("div");
+    wrap.appendChild(preview);
+
+    var status = el("p", "uploaddemo-status", "");
+    var importBtn = el("button", "uploaddemo-btn primary", "Import these records");
+    importBtn.type = "button";
+    importBtn.hidden = true;
+
+    var parsedGood = [];
+
+    fileInput.addEventListener("change", function () {
+      var file = fileInput.files && fileInput.files[0];
+      preview.textContent = "";
+      importBtn.hidden = true;
+      parsedGood = [];
+      status.textContent = "";
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var parsed = parseCsv(String(reader.result));
+        if (!parsed.headers.length) {
+          preview.appendChild(el("p", "uploaddemo-caption", "Couldn't find any rows in that file."));
+          return;
+        }
+        var idx = {};
+        parsed.headers.forEach(function (h, i) { idx[h] = i; });
+        if (idx.title === undefined || idx.lat === undefined || idx.lng === undefined) {
+          preview.appendChild(el("p", "uploaddemo-caption", "Needs at least title, lat, and lng columns. Found: " + parsed.headers.join(", ")));
+          return;
+        }
+        var bad = 0;
+        parsed.rows.forEach(function (r) {
+          var title = (r[idx.title] || "").trim();
+          var lat = parseFloat(r[idx.lat]);
+          var lng = parseFloat(r[idx.lng]);
+          if (!title || isNaN(lat) || isNaN(lng)) { bad++; return; }
+          var tierRaw = idx.sharing_level !== undefined ? (r[idx.sharing_level] || "").trim().toLowerCase() : "";
+          parsedGood.push({
+            title: title,
+            desc: idx.description !== undefined ? (r[idx.description] || "").trim() : "",
+            lat: lat, lng: lng,
+            type: idx.type !== undefined && r[idx.type] ? r[idx.type].trim().toLowerCase() : "story",
+            season: idx.season !== undefined ? (r[idx.season] || "").trim() : "",
+            tier: ["member", "elder", "restricted"].indexOf(tierRaw) >= 0 ? tierRaw : "member"
+          });
+        });
+
+        preview.appendChild(el("p", null, parsedGood.length + " of " + parsed.rows.length + " rows look importable" + (bad ? " (" + bad + " skipped: missing title, lat, or lng)" : "") + "."));
+        if (parsedGood.length) {
+          var sample = el("ul", "legend");
+          parsedGood.slice(0, 5).forEach(function (row) {
+            sample.appendChild(el("li", null, row.title + " (" + row.lat.toFixed(3) + ", " + row.lng.toFixed(3) + ")"));
+          });
+          preview.appendChild(sample);
+          if (parsedGood.length > 5) preview.appendChild(el("p", "uploaddemo-caption", "…and " + (parsedGood.length - 5) + " more."));
+          importBtn.hidden = false;
+          importBtn.textContent = "Import " + parsedGood.length + " record" + (parsedGood.length > 1 ? "s" : "");
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    importBtn.addEventListener("click", function () {
+      var fname = fileInput.files && fileInput.files[0] ? fileInput.files[0].name : "uploaded file";
+      parsedGood.forEach(function (row) {
+        bulkCounter++;
+        var id = "PBULK" + String(bulkCounter).padStart(3, "0");
+        D.RECORDS[id] = {
+          title: row.title, category: "evidence", minTier: "admin",
+          verification: "unverified",
+          source: "Synthetic: imported in bulk from \"" + fname + "\"",
+          reviewer: "Not yet reviewed", reviewed: "",
+          note: "Added through bulk import, not entered by hand. Visible to administrators only until reviewed, same as a single contribution, just many at once.",
+          sections: [
+            { minTier: "admin", label: "Submission", text: (row.desc || "(no description provided in the dataset)") + (row.type ? " (Type: " + row.type + ")" : "") },
+            { minTier: "admin", label: "Submitter's requested sharing level", text: "Suggested for: " + D.TIER_INFO[row.tier].label + ". Stays visible to administrators only until reviewed." },
+            { minTier: "admin", label: "Reviewer actions", text: "Accept, request more information, or decline. (Buttons are not active in the prototype.)" }
+          ]
+        };
+        if (row.season) D.RECORDS[id].sections.splice(1, 0, { minTier: "admin", label: "Where, or what season", text: row.season });
+        D.FEATURES.points[id] = [row.lng, row.lat];
+      });
+      refreshMapData();
+      renderItems();
+      status.textContent = "Imported " + parsedGood.length + " record" + (parsedGood.length > 1 ? "s" : "") + " into the admin review queue. Nothing is visible more widely until each is reviewed individually.";
+      importBtn.disabled = true;
+      fileInput.disabled = true;
+    });
+
+    wrap.appendChild(importBtn);
+    wrap.appendChild(status);
+    return wrap;
+  }
+
+  function openBulkImportForm() {
+    state.selected = null;
+    highlight(null);
+    cancelLocationPick();
+    var c = document.getElementById("card");
+    c.textContent = "";
+    c.hidden = false;
+
+    var close = el("button", "close", "×");
+    close.type = "button";
+    close.setAttribute("aria-label", "Close");
+    close.addEventListener("click", closeCard);
+    c.appendChild(close);
+
+    var body = el("div", "body");
+    body.appendChild(el("h3", null, "Bulk import a dataset"));
+    body.appendChild(el("p", null, "For when someone hands over a lot of records at once instead of submitting one at a time, like a hired ecologist's survey. Every row still lands in the review queue; nothing is published automatically."));
+    body.appendChild(buildBulkImportForm());
     c.appendChild(body);
     c.scrollTop = 0;
     if (window.matchMedia("(max-width: 900px)").matches) document.getElementById("panel").classList.remove("open");
@@ -997,6 +1317,10 @@
       });
 
       map.on("click", function (e) {
+        /* Yields to the location picker in the Contribute form: while someone is dropping a
+           pin for a brand-new submission, a click shouldn't instead open whatever existing
+           record happens to be under it. */
+        if (state.pickingLocation) return;
         var avail = clickable.filter(function (l) { return map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none"; });
         var pad = 6;
         var hits = map.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers: avail });
@@ -1093,6 +1417,8 @@
     /* Only accounts at member level or above (not anonymous public visitors) can contribute. */
     var cs = document.getElementById("contributeSection");
     if (cs) cs.hidden = !canSee("member");
+    var bi = document.getElementById("bulkImportSection");
+    if (bi) bi.hidden = !canSee("admin");
     renderElderQueue();
   }
 
@@ -1151,6 +1477,7 @@
   function openRecord(id, fly) {
     var r = D.RECORDS[id];
     if (!r || !canSee(r.minTier)) return;
+    cancelLocationPick();
     state.selected = id;
     highlight(id);
     renderCard(id);
@@ -1172,6 +1499,7 @@
   function closeCard() {
     state.selected = null;
     highlight(null);
+    cancelLocationPick();
     var c = document.getElementById("card");
     c.hidden = true;
     c.textContent = "";
@@ -1359,6 +1687,7 @@
         item.appendChild(el("p", "uploaddemo-caption", pc.text));
         if (pc.fileUrl) item.appendChild(mediaBlock({ type: pc.fileKind, caption: pc.fileName, url: pc.fileUrl }, id));
         item.appendChild(el("p", "uploaddemo-caption", "Suggested for: " + D.TIER_INFO[pc.suggestedTier].label + ". Submitted " + pc.submittedAt + "."));
+        if (pc.submittedBy) item.appendChild(el("p", "uploaddemo-caption", "Submitter: " + pc.submittedBy));
         var pactions = el("div", "uploaddemo-actions");
         var acc = el("button", "uploaddemo-btn primary", "Accept"); acc.type = "button"; acc.disabled = true;
         var dec = el("button", "uploaddemo-btn", "Decline"); dec.type = "button"; dec.disabled = true;
@@ -1422,6 +1751,46 @@
     document.getElementById("terrain3dBtn").addEventListener("click", function () { setTerrain3D(!state.terrain3d); });
 
     document.getElementById("contributeBtn").addEventListener("click", openContributeForm);
+    document.getElementById("bulkImportBtn").addEventListener("click", openBulkImportForm);
+
+    var landingEl = document.getElementById("landing");
+    var landingEnterBtns = document.querySelectorAll(".landing-enter");
+    for (var le = 0; le < landingEnterBtns.length; le++) {
+      landingEnterBtns[le].addEventListener("click", function () {
+        landingEl.classList.add("hidden");
+        if (map) map.resize();
+      });
+    }
+    var landingScrollCue = document.getElementById("landingScrollCue");
+    if (landingScrollCue) landingScrollCue.addEventListener("click", function () {
+      var features = document.querySelector(".landing-features");
+      if (features) features.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    var panelHomeBtn = document.getElementById("panelHomeBtn");
+    if (panelHomeBtn) panelHomeBtn.addEventListener("click", function () {
+      if (landingEl) {
+        landingEl.classList.remove("hidden");
+        landingEl.scrollTop = 0;
+      }
+    });
+
+    /* Reveal the three feature cards as they scroll into view, instead of
+       them just sitting there already visible. Starts them hidden only once
+       we know the observer will actually run, so a browser without
+       IntersectionObserver still shows them normally. */
+    var featureCards = document.querySelectorAll(".landing-feature");
+    if (featureCards.length && "IntersectionObserver" in window) {
+      featureCards.forEach(function (card) { card.classList.add("landing-feature--pre"); });
+      var revealObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.remove("landing-feature--pre");
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.2 });
+      featureCards.forEach(function (card) { revealObserver.observe(card); });
+    }
 
     pickStyle().then(initMap);
   }

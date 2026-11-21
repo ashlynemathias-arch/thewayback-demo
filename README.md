@@ -36,6 +36,10 @@ No install and no account are needed. The map background (basemap) loads from th
 - A "Walk the trail" photo-journey on the River Trail record: click through a short series of stops with a caption at each one. It reuses the same real, generically-licensed regional photos already in `media/`, captioned honestly as representative of the terrain, not actual photographs of that trail.
 - "Play this trapline's story" on the Trapline Registration Area: the same four-chapter registration timeline already in that record, played as a guided flythrough instead of read as a table. Clicking it tilts the map into 3D terrain and flies between each chapter's place (the Trapline Cabin, the Winter Trail to the Ridge, then the area as a whole), with its own verification badge at every stop, since the four original records weren't all proven the same way. The AI's only role is sequencing those records and writing the connecting captions; every name, and the order itself, is something a person would approve first.
 - "Speak to contribute" on the Contribute form: an optional voice draft for anyone who'd rather talk than type into a web form. It uses Chrome's built-in speech recognition to transcribe, then a handful of keyword rules (not real language understanding) to draft a title, type, place/season, and suggested sharing level, which are then shown back for the person to check, edit, and approve before anything is submitted, same as typing it in directly. One honesty note: unlike everything else in this prototype, Chrome's speech recognition sends the recording to Google's servers to transcribe it, so this one feature doesn't clear the "no Google" bar the rest of the demo holds to. A real version would need its own speech model. The form also gained a "Where, or what season" field to give this something concrete to draft into.
+- A real "where is this?" step on the Contribute form, from Meeting 5 feedback: creating a brand-new place used to drop it at a random spot near the map's center regardless of what the submitter meant. Now they either click the map to pin the exact spot, or say they're not sure yet, in which case the submission still goes in but is flagged for a reviewer to confirm the real location before it's relied on.
+- An anonymous-submission option on both Contribute forms, also from Meeting 5: an optional name field plus a "submit this anonymously" checkbox, for anyone who'd rather flag something, like a good harvesting location, without their name attached, even to administrators.
+- A "Bulk import" feature (Administrator level only): upload a CSV with many rows at once, see a preview of what parsed and what didn't, then import them all into the same admin review queue as a single Contribute submission, for when a lot of data arrives at once, such as from a hired ecologist's survey, instead of one record at a time.
+- A welcome screen before the map loads, with a short framing paragraph about what this is and an "Enter the map" button, so the prototype doesn't just drop a visitor straight into a sidebar and a map with no context.
 
 ## Files
 
@@ -95,6 +99,16 @@ Check each host's current free-tier terms before relying on it.
 5. Community approval for every item, with the Nation holding ownership of its own data.
 6. Hosting, basemap and data residency decisions made by City Media Collective and the Nations it works with.
 7. Legal and governance review before any real data is loaded.
+
+## Open questions from Meeting 5 (not built, for discussion)
+
+A few points raised in Meeting 5 (Nov 8) are bigger governance or design questions than something this prototype can just code its way to an answer for. Recording them here rather than quietly dropping them:
+
+- **Which community is leading.** If this platform ever serves more than one Nation, something needs to decide whose governance rules, review process, and ownership terms apply to a given map, especially before any shared infrastructure or shared review queue is built. This prototype only ever models one community at a time, so it doesn't yet have an answer, this needs a real decision from City Media Collective and the Nations it works with, not a default baked into the code.
+- **Overlapping community maps.** The demo already shows one kind of overlap, an external industrial claim crossing a community's own boundary (the Overlap Zone and Proposed Industrial Boundary records), with a visibly darker fill where they cross. That's a different problem from two communities' own traditional territories overlapping each other, which is a sensitive, often actively negotiated question between Nations themselves. A real platform would need a deliberate answer for how, or whether, overlapping community-held areas are shown at all, and who gets to decide that, rather than just reusing the industrial-overlap visual as a stand-in.
+- **A real homepage.** Tonight added a simple welcome screen as a first pass, but "think about usability next" was the actual note, so a fuller pass on onboarding, navigation, and what a first-time visitor needs to see is still worth doing deliberately rather than incrementally.
+
+One line from the meeting notes ("Indigenous maps use Something connect") wasn't legible enough to act on, flagging it here rather than guessing at what tool or platform it meant.
 
 ## Tools used
 

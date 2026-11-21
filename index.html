@@ -9,13 +9,68 @@
 </head>
 <body>
 
+  <div class="landing" id="landing">
+    <section class="landing-hero">
+      <div class="landing-hero-bg"></div>
+      <div class="landing-hero-scrim"></div>
+      <div class="landing-hero-inner">
+        <div class="landing-wordmark">Land Knowledge Map</div>
+        <div class="landing-content">
+          <p class="landing-eyebrow">Prototype for City Media Collective</p>
+          <h1>A living map of a community's own land knowledge</h1>
+          <p class="landing-tagline">Four access levels, a real Elder review step before anything goes public, and OCAP ownership principles built in from the start.</p>
+          <button type="button" class="landing-btn landing-enter" id="landingEnter">
+            Enter the map<span class="landing-btn-arrow" aria-hidden="true">&rarr;</span>
+          </button>
+        </div>
+        <button type="button" class="landing-scroll-cue" id="landingScrollCue" aria-label="See what this prototype shows">
+          <span></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="landing-features">
+      <div class="landing-feature">
+        <div class="landing-feature-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
+        </div>
+        <h3>Four access levels</h3>
+        <p>Public, community member, Elder and administrator views each surface a different slice of the map, so sensitive knowledge only reaches the people meant to see it.</p>
+      </div>
+      <div class="landing-feature">
+        <div class="landing-feature-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.6 3.2 7.9 8 9 4.8-1.1 8-4.4 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <h3>Elder review, every time</h3>
+        <p>New places, photos and stories sit in a queue until an Elder confirms them. Nothing reaches the public map on its own.</p>
+      </div>
+      <div class="landing-feature">
+        <div class="landing-feature-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        </div>
+        <h3>OCAP, not an afterthought</h3>
+        <p>Ownership, control, access and possession of what's submitted stay with the community, not with this tool.</p>
+      </div>
+    </section>
+
+    <div class="landing-enter-again">
+      <button type="button" class="landing-btn landing-btn-secondary landing-enter" id="landingEnterBottom">
+        Enter the map<span class="landing-btn-arrow" aria-hidden="true">&rarr;</span>
+      </button>
+    </div>
+
+    <p class="landing-fineprint">Everything shown here is synthetic and illustrative, built for an Ivey MSc AFP capstone project.</p>
+  </div>
+
   <div class="banner" role="note">
     Prototype. All content is synthetic. Locations, trails and boundaries are fictional and illustrative.
   </div>
 
   <div class="layout">
     <aside class="panel" id="panel" aria-label="Map controls">
-      <h1>Land Knowledge Map</h1>
+      <button type="button" class="panel-home" id="panelHomeBtn" aria-label="Back to the homepage introduction">
+        <h1>Land Knowledge Map</h1>
+      </button>
       <p class="sub">Prototype for City Media Collective</p>
 
       <section>
@@ -51,6 +106,12 @@
         <h2>Elder review queue</h2>
         <p class="role-blurb">Community-reported records waiting for an Elder to confirm them.</p>
         <ul class="items" id="elderQueue"></ul>
+      </section>
+
+      <section id="bulkImportSection" hidden>
+        <h2>Bulk import</h2>
+        <p class="role-blurb">For a large dataset handed over at once, like a hired ecologist's survey, instead of one submission at a time.</p>
+        <button type="button" class="contribute-btn" id="bulkImportBtn">Import a dataset (CSV)</button>
       </section>
 
       <section>
